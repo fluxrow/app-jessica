@@ -3,7 +3,7 @@ import {
   CheckCircle2, Circle, Activity, Calendar, Heart, Trophy, 
   ChevronRight, ChevronLeft, Info, Sparkles, Loader2, X, 
   MessageCircleHeart, ChevronDown, ChevronUp, Image as ImageIcon,
-  Droplet, Timer, Share2, Music, Dumbbell, Award
+  Droplet, Timer, Share2, Music, Dumbbell, Award, User, Camera, Save, Target
 } from 'lucide-react';
 
 // --- BANCO DE IMAGENS ---
@@ -193,6 +193,10 @@ export default function App() {
   const [cargasRegistadas, setCargasRegistadas] = useState(() => loadState('jessica_cargas', {}));
   const [aguaDiaria, setAguaDiaria] = useState(() => loadState('jessica_agua', {}));
   const [medalhasDesbloqueadas, setMedalhasDesbloqueadas] = useState(() => loadState('jessica_medalhas', []));
+  
+  // NOVOS ESTADOS PARA O PERFIL
+  const [fotoPerfil, setFotoPerfil] = useState(() => loadState('jessica_foto', null));
+  const [perfilUsuario, setPerfilUsuario] = useState(() => loadState('jessica_perfil', { peso: '', altura: '', idade: '', objetivo: '' }));
 
   // ESTADOS VOLÁTEIS (Sessão)
   const [diasExpandidos, setDiasExpandidos] = useState({});
@@ -201,6 +205,7 @@ export default function App() {
   const [modalDica, setModalDica] = useState({ ativo: false, exercicio: "", texto: "", loading: false });
   const [modalMedalhas, setModalMedalhas] = useState(false);
   const [showMusicMenu, setShowMusicMenu] = useState(false);
+  const [modalPerfil, setModalPerfil] = useState(false); // Modal do Perfil
   
   // ESTADOS CRONÓMETRO
   const [tempoDescanso, setTempoDescanso] = useState(0);
@@ -213,6 +218,8 @@ export default function App() {
   useEffect(() => { localStorage.setItem('jessica_cargas', JSON.stringify(cargasRegistadas)); }, [cargasRegistadas]);
   useEffect(() => { localStorage.setItem('jessica_agua', JSON.stringify(aguaDiaria)); }, [aguaDiaria]);
   useEffect(() => { localStorage.setItem('jessica_medalhas', JSON.stringify(medalhasDesbloqueadas)); }, [medalhasDesbloqueadas]);
+  useEffect(() => { localStorage.setItem('jessica_foto', JSON.stringify(fotoPerfil)); }, [fotoPerfil]);
+  useEffect(() => { localStorage.setItem('jessica_perfil', JSON.stringify(perfilUsuario)); }, [perfilUsuario]);
 
   // EFEITO DO CRONÓMETRO
   useEffect(() => {
@@ -226,29 +233,14 @@ export default function App() {
     return () => clearInterval(intervalo);
   }, [timerAtivo, tempoDescanso]);
 
-  // EFEITO DE GAMIFICAÇÃO (Desbloquear Medalhas)
+  // EFEITO DE GAMIFICAÇÃO
   useEffect(() => {
     const checkMedalhas = () => {
       let novas = [...medalhasDesbloqueadas];
-      
-      // 1. Primeiro Passo (Algum exercício feito)
-      if (!novas.includes('primeiro_passo') && Object.keys(itensConcluidos).length > 0) {
-        novas.push('primeiro_passo');
-      }
-      
-      // 2. Rainha da Água (Qualquer dia com 8 copos)
-      if (!novas.includes('hidratada') && Object.values(aguaDiaria).some(copos => copos >= 8)) {
-        novas.push('hidratada');
-      }
-
-      // 3. Focada na Carga (Mais de 5 cargas registadas)
-      if (!novas.includes('focada') && Object.keys(cargasRegistadas).length >= 5) {
-        novas.push('focada');
-      }
-
-      if (novas.length > medalhasDesbloqueadas.length) {
-        setMedalhasDesbloqueadas(novas);
-      }
+      if (!novas.includes('primeiro_passo') && Object.keys(itensConcluidos).length > 0) novas.push('primeiro_passo');
+      if (!novas.includes('hidratada') && Object.values(aguaDiaria).some(copos => copos >= 8)) novas.push('hidratada');
+      if (!novas.includes('focada') && Object.keys(cargasRegistadas).length >= 5) novas.push('focada');
+      if (novas.length > medalhasDesbloqueadas.length) setMedalhasDesbloqueadas(novas);
     };
     checkMedalhas();
   }, [itensConcluidos, aguaDiaria, cargasRegistadas, medalhasDesbloqueadas]);
@@ -259,7 +251,6 @@ export default function App() {
     if (semana <= 8) return PLANO_TREINO.fase2;
     return PLANO_TREINO.fase3;
   };
-
   const faseAtual = getFaseAtual();
 
   const getExerciciosDoDia = (fase, tipo) => {
@@ -282,22 +273,10 @@ export default function App() {
     setItensConcluidos(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const registarCarga = (nomeExercicio, valor) => {
-    setCargasRegistadas(prev => ({ ...prev, [nomeExercicio]: valor }));
-  };
-
-  const beberAgua = (diaKey) => {
-    setAguaDiaria(prev => {
-      const atual = prev[diaKey] || 0;
-      return { ...prev, [diaKey]: atual >= 8 ? 0 : atual + 1 };
-    });
-  };
-
-  const ativarDescanso = (e) => {
-    e.stopPropagation();
-    setTempoDescanso(60);
-    setTimerAtivo(true);
-  };
+  const registarCarga = (nomeExercicio, valor) => setCargasRegistadas(prev => ({ ...prev, [nomeExercicio]: valor }));
+  const beberAgua = (diaKey) => setAguaDiaria(prev => { const atual = prev[diaKey] || 0; return { ...prev, [diaKey]: atual >= 8 ? 0 : atual + 1 }; });
+  
+  const ativarDescanso = (e) => { e.stopPropagation(); setTempoDescanso(60); setTimerAtivo(true); };
 
   const partilharTreino = (diaInfo, dIdx) => {
     const progDia = calcularProgressoDia(dIdx, diaInfo);
@@ -309,15 +288,9 @@ export default function App() {
   const calcularProgressoDia = (diaIndex, dia) => {
     const exercicios = getExerciciosDoDia(faseAtual, dia.tipo);
     let total = 0; let feitos = 0;
-    if (dia.tipo.includes("Cardio")) {
-      total++; if (itensConcluidos[`${semanaAtual}-${diaIndex}-cardio-0`]) feitos++;
-    }
-    exercicios.forEach((_, idx) => {
-      total++; if (itensConcluidos[`${semanaAtual}-${diaIndex}-ex-${idx}`]) feitos++;
-    });
-    if (dia.tipo.includes("Descanso")) {
-      total++; if (itensConcluidos[`${semanaAtual}-${diaIndex}-descanso-0`]) feitos++;
-    }
+    if (dia.tipo.includes("Cardio")) { total++; if (itensConcluidos[`${semanaAtual}-${diaIndex}-cardio-0`]) feitos++; }
+    exercicios.forEach((_, idx) => { total++; if (itensConcluidos[`${semanaAtual}-${diaIndex}-ex-${idx}`]) feitos++; });
+    if (dia.tipo.includes("Descanso")) { total++; if (itensConcluidos[`${semanaAtual}-${diaIndex}-descanso-0`]) feitos++; }
     return total === 0 ? 0 : Math.round((feitos / total) * 100);
   };
 
@@ -349,37 +322,58 @@ export default function App() {
     setModalDica({ ativo: true, exercicio: nomeExercicio, texto: resposta, loading: false });
   };
 
+  // --- Função Upload de Foto ---
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFotoPerfil(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-24 relative overflow-x-hidden">
       
       {/* CABEÇALHO */}
       <header className="bg-gradient-to-r from-rose-500 via-purple-500 to-indigo-600 text-white p-6 shadow-lg rounded-b-[2rem] relative overflow-hidden">
-        {/* Efeito de brilho de fundo */}
         <div className="absolute top-0 right-0 w-48 h-48 bg-white opacity-10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
 
         <div className="flex items-center justify-between mb-4 relative z-10">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight drop-shadow-sm">Treino da Jess</h1>
-            <p className="text-white/90 text-sm mt-1 flex items-center gap-1 font-medium">
-              <Activity size={16} /> Evolução Contínua
-            </p>
+          
+          {/* SECÇÃO DO PERFIL (Clicável) */}
+          <div 
+            onClick={() => setModalPerfil(true)}
+            className="flex items-center gap-3 cursor-pointer group transition-transform active:scale-95"
+            title="Ver Perfil"
+          >
+            <div className="w-14 h-14 rounded-full bg-white/20 border-2 border-white/60 overflow-hidden flex items-center justify-center shrink-0 shadow-sm relative group-hover:border-white transition-colors">
+              {fotoPerfil ? (
+                <img src={fotoPerfil} alt="Perfil da Jessica" className="w-full h-full object-cover" />
+              ) : (
+                <User size={28} className="text-white/90" />
+              )}
+              {/* Overlay edit icon on hover */}
+              <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera size={16} className="text-white" />
+              </div>
+            </div>
+            
+            <div>
+              <h1 className="text-3xl font-extrabold tracking-tight drop-shadow-sm">Treino da Jess</h1>
+              <p className="text-white/90 text-sm mt-0.5 flex items-center gap-1.5 font-medium bg-white/10 w-fit px-2 py-0.5 rounded-full">
+                <Activity size={14} /> O teu espaço
+              </p>
+            </div>
           </div>
           
           <div className="flex gap-2">
-            {/* Botão Música */}
-            <button 
-              onClick={() => setShowMusicMenu(true)}
-              className="bg-white/20 hover:bg-white/30 p-3 rounded-full backdrop-blur-sm transition-colors shadow-inner"
-              title="Playlist de Treino"
-            >
+            <button onClick={() => setShowMusicMenu(true)} className="bg-white/20 hover:bg-white/30 p-3 rounded-full backdrop-blur-sm transition-colors shadow-inner">
               <Music size={22} className="text-white" />
             </button>
-
-            {/* Botão Gamificação (Medalhas) */}
-            <button 
-              onClick={() => setModalMedalhas(true)}
-              className="bg-white/20 hover:bg-white/30 p-3 rounded-full backdrop-blur-sm transition-colors shadow-inner relative"
-            >
+            <button onClick={() => setModalMedalhas(true)} className="bg-white/20 hover:bg-white/30 p-3 rounded-full backdrop-blur-sm transition-colors shadow-inner relative">
               <Award size={22} className="text-yellow-300" />
               {medalhasDesbloqueadas.length > 0 && (
                 <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center shadow-sm">
@@ -566,7 +560,6 @@ export default function App() {
                               className={`flex flex-col p-4 bg-white rounded-2xl border transition-all shadow-sm
                                 ${isFeito ? 'border-emerald-200 bg-emerald-50/10' : 'border-slate-200'}`}
                             >
-                              {/* Top row: Check, Image, Info */}
                               <div className="flex gap-3 cursor-pointer" onClick={() => toggleItem(dIdx, 'ex', eIdx)}>
                                 <div className="flex items-center shrink-0 pt-1">
                                   {isFeito ? <CheckCircle2 size={26} className="text-emerald-500" /> : <Circle size={26} className="text-slate-300" />}
@@ -598,10 +591,7 @@ export default function App() {
                                 </div>
                               </div>
 
-                              {/* Bottom row: Carga Input & Timer Botão */}
                               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                                
-                                {/* Input Carga */}
                                 <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 w-1/2">
                                   <Dumbbell size={14} className="text-slate-400" />
                                   <input 
@@ -613,8 +603,6 @@ export default function App() {
                                   />
                                   <span className="text-xs text-slate-400 font-bold">kg</span>
                                 </div>
-
-                                {/* Botão Descanso */}
                                 <button 
                                   onClick={ativarDescanso}
                                   className="flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3 py-2 rounded-xl text-xs font-bold flex-1 transition-colors active:scale-95 border border-indigo-100"
@@ -628,7 +616,6 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* BOTÃO DE PARTILHAR (Final do Dia) */}
                     <div className="mt-6">
                       <button 
                         onClick={() => partilharTreino(dia, dIdx)}
@@ -647,6 +634,113 @@ export default function App() {
       </main>
 
       {/* --- SOBREPOSIÇÕES (MODAIS E ALERTAS) --- */}
+
+      {/* MODAL: PERFIL DO UTILIZADOR */}
+      {modalPerfil && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[70] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in zoom-in-95">
+            
+            {/* Header Modal Perfil */}
+            <div className="bg-slate-50 p-5 border-b border-slate-100 flex justify-between items-center relative">
+              <h3 className="font-bold text-xl text-slate-800 flex items-center gap-2">
+                <User size={22} className="text-indigo-500"/> O teu Perfil
+              </h3>
+              <button onClick={() => setModalPerfil(false)} className="bg-slate-200 hover:bg-slate-300 p-1.5 rounded-full text-slate-600 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {/* Upload Foto de Perfil */}
+              <div className="flex flex-col items-center mb-6">
+                <div className="relative group cursor-pointer mb-3">
+                  <div className="w-24 h-24 rounded-full bg-indigo-50 border-4 border-indigo-100 overflow-hidden flex items-center justify-center shadow-md">
+                    {fotoPerfil ? (
+                      <img src={fotoPerfil} alt="Perfil" className="w-full h-full object-cover" />
+                    ) : (
+                      <User size={40} className="text-indigo-300" />
+                    )}
+                  </div>
+                  {/* Botão flutuante para editar imagem */}
+                  <label className="absolute bottom-0 right-0 bg-indigo-600 text-white p-2 rounded-full cursor-pointer shadow-lg hover:bg-indigo-700 transition-colors active:scale-95">
+                    <Camera size={16} />
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handleImageUpload}
+                    />
+                  </label>
+                </div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Jessica</p>
+              </div>
+
+              {/* Formulário de Dados Biométricos */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Peso Inicial</label>
+                    <div className="relative">
+                      <input 
+                        type="number" 
+                        value={perfilUsuario.peso}
+                        onChange={(e) => setPerfilUsuario({...perfilUsuario, peso: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                        placeholder="Ex: 65"
+                      />
+                      <span className="absolute right-4 top-2.5 text-sm font-medium text-slate-400">kg</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Altura</label>
+                    <div className="relative">
+                      <input 
+                        type="number" 
+                        value={perfilUsuario.altura}
+                        onChange={(e) => setPerfilUsuario({...perfilUsuario, altura: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                        placeholder="Ex: 165"
+                      />
+                      <span className="absolute right-4 top-2.5 text-sm font-medium text-slate-400">cm</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Idade</label>
+                  <input 
+                    type="number" 
+                    value={perfilUsuario.idade}
+                    onChange={(e) => setPerfilUsuario({...perfilUsuario, idade: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                    placeholder="A tua idade..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">
+                    <Target size={14} className="text-rose-500" /> Objetivo Principal
+                  </label>
+                  <textarea 
+                    value={perfilUsuario.objetivo}
+                    onChange={(e) => setPerfilUsuario({...perfilUsuario, objetivo: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all min-h-[80px] resize-none"
+                    placeholder="Ex: Ganhar resistência, definir pernas, saúde geral..."
+                  />
+                </div>
+              </div>
+
+              {/* Botão Fechar/Guardar */}
+              <button 
+                onClick={() => setModalPerfil(false)}
+                className="w-full mt-6 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-lg transition-colors active:scale-95"
+              >
+                <Save size={18} /> Guardar Perfil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CRONÓMETRO FLUTUANTE ATIVO */}
       {timerAtivo && (
