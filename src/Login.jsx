@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Activity, Mail, Lock, LogIn, Chrome, ArrowRight, Loader2, Dumbbell } from 'lucide-react';
-import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword } from './firebase';
+import { supabase } from './supabase';
 
 export default function Login({ onLoginSuccess }) {
   const [email, setEmail] = useState('');
@@ -15,16 +15,23 @@ export default function Login({ onLoginSuccess }) {
     setError('');
 
     try {
-      if (auth && auth.app.options.apiKey !== "dummy_key") {
-        // Firebase Real
+      const hasRealKeys = supabase.supabaseUrl !== 'https://dummy.supabase.co';
+      
+      if (hasRealKeys) {
+        // Supabase Real
         if (provider === 'google') {
-          await signInWithPopup(auth, googleProvider);
+          const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo: window.location.origin }
+          });
+          if (error) throw error;
         } else {
-          await signInWithEmailAndPassword(auth, email, password);
+          const { error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+          onLoginSuccess();
         }
-        onLoginSuccess();
       } else {
-        // Mock Login (Simula entrada quando não tem chaves do Firebase ainda)
+        // Mock Login (Simula entrada quando não tem chaves do Supabase ainda)
         setTimeout(() => {
           onLoginSuccess();
         }, 1000);
@@ -33,7 +40,8 @@ export default function Login({ onLoginSuccess }) {
       setError("Erro ao entrar. Verifica as tuas credenciais.");
       console.error(err);
     } finally {
-      if (auth && auth.app.options.apiKey !== "dummy_key") {
+      const hasRealKeys = supabase.supabaseUrl !== 'https://dummy.supabase.co';
+      if (hasRealKeys) {
          setLoading(false);
       }
     }
