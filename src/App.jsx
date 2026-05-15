@@ -191,6 +191,7 @@ export default function App() {
   const [semanaAtual, setSemanaAtual] = useState(() => loadState('jessica_semana', 1));
   const [itensConcluidos, setItensConcluidos] = useState(() => loadState('jessica_checks', {})); 
   const [cargasRegistadas, setCargasRegistadas] = useState(() => loadState('jessica_cargas', {}));
+  const [historicoCargas, setHistoricoCargas] = useState(() => loadState('jessica_historico_cargas', {}));
   const [aguaDiaria, setAguaDiaria] = useState(() => loadState('jessica_agua', {}));
   const [medalhasDesbloqueadas, setMedalhasDesbloqueadas] = useState(() => loadState('jessica_medalhas', []));
   
@@ -216,6 +217,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('jessica_semana', JSON.stringify(semanaAtual)); }, [semanaAtual]);
   useEffect(() => { localStorage.setItem('jessica_checks', JSON.stringify(itensConcluidos)); }, [itensConcluidos]);
   useEffect(() => { localStorage.setItem('jessica_cargas', JSON.stringify(cargasRegistadas)); }, [cargasRegistadas]);
+  useEffect(() => { localStorage.setItem('jessica_historico_cargas', JSON.stringify(historicoCargas)); }, [historicoCargas]);
   useEffect(() => { localStorage.setItem('jessica_agua', JSON.stringify(aguaDiaria)); }, [aguaDiaria]);
   useEffect(() => { localStorage.setItem('jessica_medalhas', JSON.stringify(medalhasDesbloqueadas)); }, [medalhasDesbloqueadas]);
   useEffect(() => { localStorage.setItem('jessica_foto', JSON.stringify(fotoPerfil)); }, [fotoPerfil]);
@@ -273,7 +275,15 @@ export default function App() {
     setItensConcluidos(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const registarCarga = (nomeExercicio, valor) => setCargasRegistadas(prev => ({ ...prev, [nomeExercicio]: valor }));
+  const registarCarga = (nomeExercicio, valor) => {
+    setCargasRegistadas(prev => ({ ...prev, [nomeExercicio]: valor }));
+    if (valor) {
+      setHistoricoCargas(prev => {
+        const exHist = prev[nomeExercicio] || {};
+        return { ...prev, [nomeExercicio]: { ...exHist, [semanaAtual]: valor } };
+      });
+    }
+  };
   const beberAgua = (diaKey) => setAguaDiaria(prev => { const atual = prev[diaKey] || 0; return { ...prev, [diaKey]: atual >= 8 ? 0 : atual + 1 }; });
   
   const ativarDescanso = (e) => { e.stopPropagation(); setTempoDescanso(60); setTimerAtivo(true); };
@@ -765,6 +775,44 @@ export default function App() {
                     placeholder="Ex: Ganhar resistência, definir pernas, saúde geral..."
                   />
                 </div>
+                </div>
+              </div>
+
+              {/* Secção de Gráficos de Evolução */}
+              <div className="mt-6 border-t border-slate-100 pt-5">
+                <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <Activity size={16} className="text-emerald-500" /> Os meus Gains (Progresso)
+                </h4>
+                
+                {Object.keys(historicoCargas).length === 0 ? (
+                  <p className="text-xs text-slate-400 text-center py-2 bg-slate-50 rounded-xl">Ainda não registaste cargas. Regista nos treinos para veres a tua evolução aqui!</p>
+                ) : (
+                  <div className="space-y-5">
+                    {Object.entries(historicoCargas).slice(0, 3).map(([exercicio, semanasData]) => {
+                      const semanas = Object.keys(semanasData).sort((a,b) => Number(a) - Number(b));
+                      const maxCarga = Math.max(...Object.values(semanasData).map(Number));
+                      
+                      return (
+                        <div key={exercicio}>
+                          <h5 className="text-xs font-bold text-slate-600 mb-2 truncate">{exercicio}</h5>
+                          <div className="flex items-end gap-2 h-16 bg-slate-50 p-2 rounded-xl border border-slate-100 overflow-x-auto">
+                            {semanas.map(sem => {
+                              const carga = Number(semanasData[sem]);
+                              const heightPct = maxCarga > 0 ? Math.max((carga / maxCarga) * 100, 15) : 15;
+                              return (
+                                <div key={sem} className="flex flex-col items-center gap-1 min-w-[28px]">
+                                  <span className="text-[9px] font-bold text-indigo-600">{carga}</span>
+                                  <div className="w-5 bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-sm rounded-t-md transition-all duration-500 shadow-sm" style={{ height: `${heightPct}%` }}></div>
+                                  <span className="text-[8px] text-slate-400">S{sem}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Botão Fechar/Guardar */}
