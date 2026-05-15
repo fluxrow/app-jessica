@@ -285,6 +285,32 @@ export default function App() {
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
+  const partilharFotoTreino = async (diaInfo, dIdx, file) => {
+    const progDia = calcularProgressoDia(dIdx, diaInfo);
+    const msg = `Treino da Semana ${semanaAtual} (${diaInfo.dia}) concluído em ${progDia}%! 💪🔥`;
+    
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          title: 'O Meu Treino',
+          text: msg,
+          files: [file]
+        });
+      } catch (error) {
+        console.error("Erro ao partilhar:", error);
+      }
+    } else {
+      alert("Oops! O teu navegador não suporta partilhar imagens diretamente. 😢");
+    }
+  };
+
+  const handleCapturePhoto = (e, diaInfo, dIdx) => {
+    const file = e.target.files[0];
+    if (file) {
+      partilharFotoTreino(diaInfo, dIdx, file);
+    }
+  };
+
   const calcularProgressoDia = (diaIndex, dia) => {
     const exercicios = getExerciciosDoDia(faseAtual, dia.tipo);
     let total = 0; let feitos = 0;
@@ -616,12 +642,23 @@ export default function App() {
                       </div>
                     )}
 
-                    <div className="mt-6">
+                    <div className="mt-6 flex flex-col gap-3">
+                      <label className="w-full bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-bold py-3.5 rounded-2xl flex justify-center items-center gap-2 shadow-md shadow-purple-200 transition-colors active:scale-95 cursor-pointer">
+                        <Camera size={18} /> Tirar Foto & Partilhar (Instagram)
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          capture="environment" 
+                          className="hidden" 
+                          onChange={(e) => handleCapturePhoto(e, dia, dIdx)}
+                        />
+                      </label>
+
                       <button 
                         onClick={() => partilharTreino(dia, dIdx)}
                         className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-2xl flex justify-center items-center gap-2 shadow-md shadow-emerald-200 transition-colors active:scale-95"
                       >
-                        <Share2 size={18} /> Partilhar com o Namorado!
+                        <Share2 size={18} /> Partilhar progresso no WhatsApp
                       </button>
                     </div>
 
