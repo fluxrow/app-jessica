@@ -5,6 +5,7 @@ import {
   MessageCircleHeart, ChevronDown, ChevronUp, Image as ImageIcon,
   Droplet, Timer, Share2, Music, Dumbbell, Award, User, Camera, Save, Target
 } from 'lucide-react';
+import Login from './Login';
 
 // --- BANCO DE IMAGENS ---
 const IMGS = {
@@ -198,6 +199,9 @@ export default function App() {
   // NOVOS ESTADOS PARA O PERFIL
   const [fotoPerfil, setFotoPerfil] = useState(() => loadState('jessica_foto', null));
   const [perfilUsuario, setPerfilUsuario] = useState(() => loadState('jessica_perfil', { peso: '', altura: '', idade: '', objetivo: '' }));
+  
+  // ESTADO DE AUTENTICAÇÃO
+  const [isAuthenticated, setIsAuthenticated] = useState(() => loadState('jessica_auth', false));
 
   // ESTADOS VOLÁTEIS (Sessão)
   const [diasExpandidos, setDiasExpandidos] = useState({});
@@ -222,6 +226,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('jessica_medalhas', JSON.stringify(medalhasDesbloqueadas)); }, [medalhasDesbloqueadas]);
   useEffect(() => { localStorage.setItem('jessica_foto', JSON.stringify(fotoPerfil)); }, [fotoPerfil]);
   useEffect(() => { localStorage.setItem('jessica_perfil', JSON.stringify(perfilUsuario)); }, [perfilUsuario]);
+  useEffect(() => { localStorage.setItem('jessica_auth', JSON.stringify(isAuthenticated)); }, [isAuthenticated]);
 
   // EFEITO DO CRONÓMETRO
   useEffect(() => {
@@ -369,6 +374,10 @@ export default function App() {
       reader.readAsDataURL(file);
     }
   };
+
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-24 relative overflow-x-hidden">
